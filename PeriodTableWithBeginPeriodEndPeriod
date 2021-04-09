@@ -1,0 +1,49 @@
+USE [BI_TEMP]
+GO
+/****** Object:  StoredProcedure [dbo].[_sp_PharmatrentMonthly_ImportPeriodTempTable]    Script Date: 09/04/2021 11:59:55 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER  PROCEDURE [dbo].[_sp_PharmatrentMonthly_ImportPeriodTempTable]
+@CubeName nvarchar(125),
+@BeginPeriod date,
+@EndPeriod date
+AS
+BEGIN
+	SET NOCOUNT ON
+DECLARE @SqlCommand nvarchar(max) = ''
+	DECLARE @intFlag DATE 
+	SET @intFlag = @BeginPeriod
+	WHILE (@intFlag <=@EndPeriod)
+	BEGIN
+		
+		SET @SqlCommand = 'INSERT INTO ' + @CubeName + ' (
+		  PeriodDatakey, PeriodFactor, PeriodId, IdPeriod, 
+		  Bimester, CalBimesterOrder, Month, CalMonthOrder, 
+		  Quarter, CalQuarterOrder, HalfYear, CalSemesterOrder, Quadrimester, CalThirdOrder, Year, CalYearOrder, CalYearOrderQ, 
+		  Mat, MatBimesterOrder, MatQ, MatQuarterOrder, MatSemesterOrder, MatThirdOrder, MatYearOrder, MatYearOrderQ, 
+		  MonthInYear, MonthYTD, QuarterInYear, RelMonthOrder, RelativeBimester, RelativeHalfYear, RelativeMonth, RelativeQuadrimester, RelativeQuarter, 
+		  Season, SeasonOrder, SeasonYear, SeasonYearOrder, YearQ, Ytd, YtdOrder
+		)
+		SELECT ''M'' + CONVERT(NVARCHAR(6),' +cast( @intFlag as nvarchar(25)) + ',112) ,1.0000000 ,''C00'' + CONVERT(NVARCHAR(6),'+cast( @intFlag as nvarchar(25))+ ',112) ,
+		''M'' + CONVERT(NVARCHAR(6),' + cast(@intFlag  as nvarchar(25))+ ',112) ,'''' , '''' , 
+		CONVERT(NVARCHAR(15),' + cast(@intFlag as nvarchar(25)) + ',100) + '' '' + CAST(YEAR(' +cast(  @intFlag  as nvarchar(25))+ ') AS NVARCHAR(4)) , 
+		'''', '''', '''', '''', '''', '''', '''', '''', 
+		  '''', '''', '''', '''', '''', '''', '''', '''', 
+		  '''', '''', '''', '''', '''', '''', '''', '''', '''', 
+		  '''', '''', '''', '''', '''', '''', '''','''','''' '
+		
+		EXEC (@SqlCommand)
+		SET @intFlag = DATEADD(MONTH, 1,@intFlag)
+	 END
+	
+END
+			 							
+
+
+
+
+
+
+					
