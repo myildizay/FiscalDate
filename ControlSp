@@ -1,0 +1,251 @@
+USE [IMSDAS_PROJECT_TPP]
+GO
+/****** Object:  StoredProcedure [dbo].[cControlDataNrm]    Script Date: 11/04/2021 14:36:18 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[cControlDataNrm] 
+@CycleId int, @AccountId int, @UnitsPercentRange int, @RecordsPercentRange int, @ProcessID int, @Return_Output varchar(500) output
+
+AS 
+
+BEGIN 
+
+Declare @cDate varchar(10)
+Declare @pDate varchar(10)
+Declare @cpDay smallint
+Declare @cpMonth smallint
+Declare @cpYear smallint
+
+Declare @DayOfWeek tinyint
+Declare @pCycleId int;
+
+Declare @cUnitandBonus decimal
+Declare @pUnitandBonus decimal
+
+Declare @cRecP decimal
+Declare @pRecP decimal
+Declare @cRecC decimal
+Declare @pRecC decimal
+Declare @cRecS decimal
+Declare @pRecS decimal
+
+BEGIN TRY
+
+if @CycleId<1 or @AccountId<1 or @UnitsPercentRange<1 or @RecordsPercentRange<1 or @CycleId=null or @AccountId=null or @UnitsPercentRange=null or @RecordsPercentRange=null
+begin
+SET @Return_Output='Have missing or wrong parameters value'
+Return -1
+end
+
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusExecuting() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+
+if (Select COUNT(*) from Cycle Where CycleID=@CycleId and (IsDeleted=0 or IsDeleted is NULL))<>1
+begin
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusUnexecuted() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Set @Return_Output='Not have one cycle record'
+Return -1
+end
+
+if (Select COUNT(*) from Account Where AccountId=@AccountId and (IsDeleted=0 or IsDeleted is NULL))=0
+begin
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusUnexecuted() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+SET @Return_Output='Not have account record'
+Return -1
+end
+
+if (Select COUNT(*) from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL))=0
+begin
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusUnexecuted() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+SET @Return_Output='Not have LogPP record with current CycleId and AccountId'
+Return -1
+end
+
+--Get date from current cycle and determine the date in weekday or weekendday
+SET @cDate=(Select CycleDate from Cycle Where CycleID=@CycleId and (IsDeleted=0 or IsDeleted is NULL))
+SET @DayOfWeek=(SELECT DATEPART(dw, @cDate))
+
+--Determine the cycle based on weekday (except of Monday) or weekendday (with Monday)
+if @DayOfWeek=1 or @DayOfWeek=7 or @DayOfWeek=2
+begin
+SET @pDate=(Select DATEADD(DAY,-7,Convert(date,@cDate)))
+SET @pCycleId=ISNULL((Select top 1 CycleID from Cycle Where CycleDate=@pDate and (IsDeleted=0 or IsDeleted is NULL) order by CycleID desc),0)
+end
+
+if @DayOfWeek!=1 and @DayOfWeek!=7 and @DayOfWeek!=2
+begin
+SET @pDate=(Select DATEADD(DAY,-1,Convert(date,@cDate)))
+SET @pCycleId=ISNULL((Select top 1 CycleID from Cycle Where CycleDate=@pDate and (IsDeleted=0 or IsDeleted is NULL) order by CycleID desc),0)
+end
+
+if (Select COUNT(*) From Cycle Where CycleID=@pCycleId and (IsDeleted=0 or IsDeleted is NULL))=0
+begin
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusUnexecuted() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+SET @Return_Output='Not have previous cycle'
+Return -1
+end
+
+if (Select COUNT(*) from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )=0
+begin
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusUnexecuted() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+SET @Return_Output='Not have LogPP previous record with previous CycleId and AccountId'
+Return -1
+end
+
+--CONTROLS ARE STARTING
+
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusControl() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+
+--Control the current cycle ref dates from current LogPP
+SET @cpDay=(Select top 1 [Day] from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+SET @cpMonth=(Select top 1 [Month] from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+SET @cpYear=(Select top 1 [Year] from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+
+if @cpDay!=DAY(CONVERT(DATE,@cDate))
+begin
+Update LogPP Set Note = 'Expected comparing ' + CAST(@cpDay as varchar(2)) + ' day is not matched with the current ' + CAST(@CycleId as varchar(10)) + ' cycle' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+
+if @cpMonth!=MONTH(CONVERT(DATE,@cDate))
+begin
+Update LogPP Set Note = 'Expected comparing ' + CAST(@cpMonth as varchar(2)) + ' month is not matched with the current ' + CAST(@CycleId as varchar(10)) + ' cycle' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+
+if @cpYear!=YEAR(CONVERT(DATE,@cDate))
+begin
+Update LogPP Set Note = 'Expected comparing ' + CAST(@cpYear as varchar(4)) + ' year is not matched with the current ' + CAST(@CycleId as varchar(10)) + ' cycle' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+
+
+--Control the previous cycle ref dates from previous LogPP
+SET @cpDay=(Select Top 1 [Day] from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+SET @cpMonth=(Select Top 1 [Month] from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+SET @cpYear=(Select Top 1 [Year] from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL))
+
+if @cpDay!=DAY(CONVERT(DATE,@pDate))
+begin
+Update LogPP Set Note = 'Expected comparing ' + CAST(@cpDay as varchar(2)) + ' day is not matched with the previous ' + CAST(@pCycleId as varchar(10)) + ' cycle' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+
+if @cpMonth!=MONTH(CONVERT(DATE,@pDate))
+begin
+Update LogPP Set Note = 'Expected comparing ' + CAST(@cpMonth as varchar(2)) + ' month is not matched with the previous ' + CAST(@pCycleId as varchar(10)) + ' cycle' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+
+if @cpYear!=YEAR(CONVERT(DATE,@pDate))
+begin
+Update LogPP Set Note = 'Expected comparing ' + CAST(@cpYear as varchar(4)) + ' year is not matched with the previous ' + CAST(@pCycleId as varchar(10)) + ' cycle' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+
+
+
+
+--Control the growth on Unit+UnitBonus
+SET @cUnitandBonus=(Select SUM(ISNULL(Unit,0)) + SUM(ISNULL(Bonus,0)) from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL)) 
+SET @pUnitandBonus=(Select SUM(ISNULL(Unit,0)) + SUM(ISNULL(Bonus,0)) from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL))
+ 
+ if @pUnitandBonus=0
+ begin
+ Update LogPP Set Note = 'Previous cycle log has not any value on unit+unitbonus' Where CycleID=@CycleId and AccountID=@AccountId 
+ --Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+ Return 0
+ end
+ 
+ if ABS((100*((@cUnitandBonus-@pUnitandBonus)/@pUnitandBonus)))>@UnitsPercentRange
+begin
+Update LogPP Set Note = '' + CAST(CAST((100*((@cUnitandBonus-@pUnitandBonus)/@pUnitandBonus)) as decimal(18,3)) as varchar(10)) + ' suspected growth on unit+unitbonus' Where CycleID=@CycleId and AccountID=@AccountId  
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+   
+ 
+ 
+ 
+--Control the growth on Record count of Product
+SET @cRecP=(Select SUM(ISNULL(RecP,0)) from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+SET @pRecP=(Select SUM(ISNULL(RecP,0)) from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+ 
+  if @pRecP=0
+ begin
+ Update LogPP Set Note = 'Previous cycle log has not any value on RecP' Where CycleID=@CycleId and AccountID=@AccountId 
+ --Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+ Return 0
+ end
+ 
+ if ABS((100*((@cRecP-@pRecP)/@pRecP)))>@RecordsPercentRange
+begin
+Update LogPP Set Note = '' + CAST(CAST((100*((@cRecP-@pRecP)/@pRecP)) as decimal(18,3)) as varchar(10)) + ' suspected growth on product record counts' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+ 
+--Control the growth on Record count of Customer
+SET @cRecC=(Select SUM(ISNULL(RecC,0)) from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL))
+SET @pRecC=(Select SUM(ISNULL(RecC,0)) from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+ 
+ if @pRecC=0
+ begin
+ Update LogPP Set Note = 'Previous cycle log has not any value on RecC' Where CycleID=@CycleId and AccountID=@AccountId 
+ --Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+ 
+ Return 0
+ end
+  
+ if ABS((100*((@cRecC-@pRecC)/@pRecC)))>@RecordsPercentRange
+ begin
+ Update LogPP Set Note = '' + CAST(CAST((100*((@cRecC-@pRecC)/@pRecC)) as decimal(18,3)) as varchar(10)) + ' suspected growth on customer record counts' Where CycleID=@CycleId and AccountID=@AccountId 
+ --Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+ Return 0
+ end
+
+
+--Control the growth on Record count of Sales
+SET @cRecS=(Select SUM(ISNULL(RecS,0)) from LogPP Where CycleID=@CycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+SET @pRecS=(Select SUM(ISNULL(RecS,0)) from LogPP Where CycleID=@pCycleId and AccountID=@AccountId and (IsDeleted=0 or IsDeleted is NULL) )
+
+ if @pRecS=0
+ begin
+ Update LogPP Set Note = 'Previous cycle log has not any value on RecS' Where CycleID=@CycleId and AccountID=@AccountId 
+ --Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+ Return 0
+ end
+
+  if ABS((100*((@cRecS-@pRecS)/@pRecS)))>@RecordsPercentRange
+begin
+Update LogPP Set Note ='' + CAST(CAST((100*((@cRecS-@pRecS)/@pRecS)) as decimal(18,3)) as varchar(10)) + ' suspected growth on sales record counts' Where CycleID=@CycleId and AccountID=@AccountId 
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusFailed() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+Return 0
+end
+
+
+--Update CycleProcess Set CycleProcessStatus=dbo.fncGetCycleProcessStatusExecuted() Where CycleID=@CycleId and AccountID=@AccountId and ProcessID=@ProcessID
+
+RETURN 1
+
+END TRY
+
+
+BEGIN CATCH
+
+  SELECT ERROR_MESSAGE(), ERROR_NUMBER()
+  RETURN -1;
+  
+END CATCH
+
+END
+          
+           
