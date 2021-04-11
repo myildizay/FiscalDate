@@ -1,0 +1,37 @@
+DECLARE     @return_value int,@Return_Output varchar(500)
+DECLARE @Message nvarchar(max)
+IF @TotalNumberOfError= 0 
+BEGIN
+	UPDATE CycleProcess SET message = 'Pharmacy File is passed from Supply Service Control successfully.........\n' + ISNULL(message ,'')  WHERE  CycleProcessID = @CycleProcessID;
+	EXEC  @return_value = [dbo].[cControlDataNrm] @CycleId = @CycleID,@AccountId = @AccountID, @ProcessID = @ProcessID , @UnitsPercentRange = 35,@RecordsPercentRange = 35,@Return_Output = @Return_Output OUTPUT
+	SELECT      @Return_Output as N'@Return_Output'
+	SELECT      'Return Value' = @return_value
+	IF @return_value  = -1  or @return_value  = 0
+	BEGIN
+		IF @return_value  = 0 
+		BEGIN
+			SELECT  @Message = Note from LogPP WHERE CycleID = @CycleID AND AccountID = @AccountID AND IsDeleted=  0
+			INSERT INTO LogProductionSupply (CycleID, AccountID, ProcessID, OperationDateTime, Status, OperationUserID) VALUES (@CycleID , @AccountID , @ProcessID , GETDATE(), DBO.fncGetCycleProcessStatusControl(),9999)
+			UPDATE CycleProcess 	  SET CycleProcessStatus =  dbo.fncGetCycleProcessStatusExecuted() , Message=   'Pharmacy File is passed from Supply Service Control successfully.........\n'+ISNULL(@Message,'') + '\n' + ISNULL(@Return_Output,'')  ,ApproveSupplyServiceFlag= 0 	WHERE  CycleProcessID = @CycleProcessID;
+		END
+		ELSE
+		BEGIN
+			SELECT @Message =  Note from LogPP WHERE CycleID = @CycleID AND AccountID = @AccountID AND IsDeleted=  0
+			INSERT INTO LogProductionSupply (CycleID, AccountID, ProcessID, OperationDateTime, Status, OperationUserID) VALUES (@CycleID , @AccountID , @ProcessID , GETDATE(), DBO.fncGetCycleProcessStatusControl(),9999)
+			UPDATE CycleProcess 	  SET CycleProcessStatus =  dbo.fncGetCycleProcessStatusExecuted(), Message=    ISNULL(@Message,'') + '\n' + ISNULL(@Return_Output,'') , ApproveSupplyServiceFlag= 0  WHERE  CycleProcessID = @CycleProcessID;
+		END
+	END
+	ELSE
+	BEGIN
+		INSERT INTO LogProductionSupply (CycleID, AccountID, ProcessID, OperationDateTime, Status, OperationUserID) VALUES (@CycleID , @AccountID , @ProcessID , GETDATE(), dbo.fncGetCycleProcessStatusExecuted(),9999)
+		UPDATE CycleProcess 	   SET CycleProcessStatus = dbo.fncGetCycleProcessStatusExecuted(),  Message=   'Pharmacy File is passed from Supply Service Control successfully.........\nPharmacy File is passed from Production Control successfully.........\n'  , ApproveSupplyServiceFlag= 1  WHERE  CycleProcessID = @CycleProcessID;
+	END
+END
+ELSE
+BEGIN
+	--UPDATE CycleProcess SET CycleProcessStatus = dbo.fncGetCycleProcessStatusAskToSupplyService(), message = 'There are '+cast(@TotalNumberOfError as nvarchar(25))+ ' error transaction for Supply Service....\n' + @ErrMessage  + '\n'+ ISNULL(message ,'')  WHERE  CycleProcessID = @CycleProcessID;
+	UPDATE CycleProcess SET CycleProcessStatus = dbo.fncGetCycleProcessStatusExecuted(), message = 'There are '+cast(@TotalNumberOfError as nvarchar(25))+ ' error transaction for Supply Service....\n' + @ErrMessage  + '\n'+ ISNULL(message ,'')  WHERE  CycleProcessID = @CycleProcessID;
+END
+
+
+
