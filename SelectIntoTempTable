@@ -1,0 +1,56 @@
+USE [DWPTREND]
+GO
+/****** Object:  StoredProcedure [dbo].[get_EczanemTop50Produc]    Script Date: 26/04/2021 09:59:49 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+
+-- =============================================
+ALTER PROCEDURE [dbo].[get_EczanemTop50Produc]
+	@pUnvEczKod as nvarchar(20),
+	@pDonem as nvarchar(20),
+	@pPType as nvarchar(15)
+AS
+BEGIN
+	DECLARE @insSQL varchar(8000)
+	DECLARE      @temptableNDF    TABLE
+	(
+	[RowNo] [int]  NOT NULL,
+	[URUN] [nvarchar](250) NULL,
+	[TL] [int]  NULL,
+	[KUTU] [int] NULL,
+	[Donem] [nvarchar](15) NULL,
+	[Eczane] [nvarchar](100) NULL
+	)
+
+
+	SET @insSQL = 'Select Top 50 ROW_NUMBER() OVER(ORDER BY SUM(A.TL) DESC) AS RowNo, ISNULL(A.Urun,'''') URUN, ISNULL(SUM(A.TL),0)  TL, ISNULL(SUM(A.KUTU),0) KUTU, 
+	A.Donem, A.AccountName as Eczane 
+	From [DWPTREND].[dbo].[TPHSELLOUT_'+@pDonem+'] A
+	INNER JOIN [DWPTREND].[dbo].[TREPPER] P ON P.Period = A.DONEM
+	Where UniverseCode =' + @pUnvEczKod   +'
+	and Goster =1  
+	and Donem=' + @pDonem  +'
+	and PazarTipi=''' + @pPType + ' ''
+	and P.isActive = 1
+	Group by  Urun, DONEM, AccountName 
+	order by sum(TL) desc '
+	insert into @temptableNDF exec (@insSQL);
+	
+	SELECT * FROM @temptableNDF
+	/*Select Top 50 ROW_NUMBER() OVER(ORDER BY SUM(A.TL) DESC) AS RowNo, ISNULL(A.Urun,'') URUN, ISNULL(SUM(A.TL),0)  TL, ISNULL(SUM(A.KUTU),0) KUTU, 
+	A.Donem, A.AccountName as Eczane 
+	From [DWPTREND].[dbo].[TPHSELLOUT] A
+	INNER JOIN [DWPTREND].[dbo].[TREPPER] P ON P.Period = A.DONEM
+	Where UniverseCode =@pUnvEczKod 
+	and Goster =1  
+	and Donem=@pDonem
+	and PazarTipi=@pPType
+	and P.isActive = 1
+	Group by  Urun, DONEM, AccountName 
+	order by sum(TL) desc
+	*/
+	
+END
