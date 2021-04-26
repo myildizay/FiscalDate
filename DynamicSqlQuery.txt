@@ -1,0 +1,156 @@
+USE [DWPTREND]
+GO
+/****** Object:  StoredProcedure [dbo].[create_PHSELLOUTAbove10]    Script Date: 26/04/2021 10:02:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[create_PHSELLOUTAbove10]
+	@pDonem as nvarchar(20)
+AS
+BEGIN
+
+	DECLARE @delSQL AS NVARCHAR(4000)
+	DECLARE @insSQL AS NVARCHAR(MAX)
+
+	create table  #temptable  
+	(
+		[PRODUCTION] [char](4) NOT NULL,
+		[DATE] [date] NOT NULL,
+		[WHS] [char](13) NOT NULL,
+		[PFC] [char](7) NOT NULL,
+		[U_CODE] [char](7) NOT NULL,
+		[PR_UNIT] [decimal](10, 0) NOT NULL,
+		[PR_BONUS] [decimal](10, 0) NOT NULL,
+		[PR_PRICE] [decimal](10, 2) NOT NULL,
+		[NDF_PRICE] [decimal](10, 2) NOT NULL,
+		[setflag] [int] NOT NULL,
+		[pub_price] [decimal](10, 2) NOT NULL,
+		[trd_price] [decimal](10, 2) NOT NULL,
+		[iskonto] [decimal](7, 2) NOT NULL,
+		[invoiceDate] [date] NOT NULL,
+		[invoiceNumber] [char](25) NOT NULL,
+		[VAT] [decimal](7, 2) NOT NULL,
+		[isPrescription] [int] NOT NULL,
+		[Tpt_Price] [decimal](10, 2) NOT NULL,
+		[PRJ_UNIT] [float] NOT NULL,
+		[PRJ_VALUE] [float] NOT NULL
+	)
+
+	create table  #temptable2 
+	(
+	[PRODUCTION] [char](4) NOT NULL,
+		[DATE] [date] NOT NULL,
+		[WHS] [char](13) NOT NULL,
+		[PFC] [char](7) NOT NULL,
+		[U_CODE] [char](7) NOT NULL,
+		[PR_UNIT] [decimal](10, 0) NOT NULL,
+		[PR_BONUS] [decimal](10, 0) NOT NULL,
+		[PR_PRICE] [decimal](10, 2) NOT NULL,
+		[NDF_PRICE] [decimal](10, 2) NOT NULL,
+		[setflag] [int] NOT NULL,
+		[pub_price] [decimal](10, 2) NOT NULL,
+		[trd_price] [decimal](10, 2) NOT NULL,
+		[iskonto] [decimal](7, 2) NOT NULL,
+		[invoiceDate] [date] NOT NULL,
+		[invoiceNumber] [char](25) NOT NULL,
+		[VAT] [decimal](7, 2) NOT NULL,
+		[isPrescription] [int] NOT NULL,
+		[Tpt_Price] [decimal](10, 2) NOT NULL,
+		[PRJ_UNIT] [float] NOT NULL,
+		[PRJ_VALUE] [float] NOT NULL
+	)
+
+
+	create table #temptableNDF  
+	(
+		[prd_cd] [nvarchar](7) NOT NULL,
+		[pub_price] [decimal](10, 2) NULL,
+		[trd_price] [decimal](10, 2) NULL,
+		[isf] [decimal](9, 2)  NULL,
+		[Ret_Price] [decimal](9, 2)  NULL,	
+		[Whs_Price] [decimal](9, 2)  NULL,	
+		[new_name] [nvarchar](200) NULL,
+		[Prod_Flag] [nvarchar](4) NULL,
+		[who_atc] [nvarchar](100) NULL
+	
+	)
+
+	set @delSQL = 'IF (EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ''dbo'' AND  TABLE_NAME = ''TPHSELLOUT_'+@pDonem+'''))'
+	SET @delSQL = @delSQL + 'BEGIN ' 
+	SET @delSQL = @delSQL + ' DROP TABLE TPHSELLOUT_'+@pDonem
+	SET @delSQL = @delSQL + ' END '
+	SET @delSQL = @delSQL + 'CREATE TABLE TPHSELLOUT_'+@pDonem+'([YIL] [nvarchar](4) NULL,
+						[DONEM] [nvarchar](6) NULL,
+						[EczaneKod] [nvarchar](25) NULL,
+						[AccountName] [nvarchar](100) NULL,
+						[UrunKod] [nvarchar](7) NULL,
+						[Urun] [NVARCHAR](100) NULL,
+						[KUTU] [int] NULL,
+						[TL] [int] NULL,
+						[PazarTipi] [varchar](15) NULL,
+						[Kategori1] [nvarchar](506) NULL,
+						[Kategori2] [nvarchar](506) NULL,
+						[Kategori3] [nvarchar](506) NULL,
+						[Kategori4] [nvarchar](506) NULL,
+						[Kategori5] [nvarchar](100) NULL,
+						[Goster] [smallint] NULL,
+						[Bolge] [nvarchar](50) NULL,
+						[UniverseCode] [nvarchar](50) NULL,
+						[OldCode] [nvarchar](50) NULL) ' 
+	EXEC  (@delSQL)
+
+	--SET @delSQL = 'delete from [TPHSELLOUT] Where DONEM =' + @pDonem
+	--EXEC sp_executesql @delSQL;
+
+	SET @insSQL = 'SELECT  PRODUCTION,DATE,WHS,PFC,U_CODE,PR_UNIT,PR_BONUS,PR_PRICE,NDF_PRICE,setflag,pub_price,trd_price,iskonto,invoiceDate, invoiceNumber,VAT,isPrescription, 0 AS TPT_Price, PRJ_UNIT,PRJ_VALUE 
+	FROM TPIPHARMATREND_MONTHLY.DBO.T' + @pDonem + ' UNION ALL   select   PRODUCTION,DATE,WHS,PFC,U_CODE,PR_UNIT,PR_BONUS,PR_PRICE,NDF_PRICE,setflag,pub_price,trd_price,iskonto,invoiceDate, invoiceNumber,VAT,isPrescription, 0 AS TPT_Price, PRJ_UNIT,PRJ_VALUE from TPIPHARMATREND_MONTHLY.DBO.R' + @pDonem 
+	insert into #temptable  	exec (@insSQL);
+
+	SET @insSQL = 'SELECT  PRODUCTION,DATE,WHS,PFC,U_CODE,PR_UNIT,PR_BONUS,PR_PRICE,NDF_PRICE,setflag,pub_price,trd_price,iskonto,invoiceDate, invoiceNumber,VAT,isPrescription, 0 AS TPT_Price, PRJ_UNIT,PRJ_VALUE
+	 FROM TPIPHARMATREND_MONTHLY.DBO.P' + @pDonem + ' UNION ALL   select   PRODUCTION,DATE,WHS,PFC,U_CODE,PR_UNIT,PR_BONUS,PR_PRICE,NDF_PRICE,setflag,pub_price,trd_price,iskonto,invoiceDate, invoiceNumber,VAT,isPrescription, 0 AS TPT_Price, PRJ_UNIT,PRJ_VALUE from TPIPHARMATREND_MONTHLY.DBO.RP' + @pDonem 
+	insert into #temptable2  	exec (@insSQL);
+
+	SET @insSQL = 'SELECT  prd_cd, pub_price, prid_price trd_price, isf, Ret_Price, Whs_Price, new_name, Prod_Flag, who_atc  FROM [10.165.64.28\SQL2008].[TPINDF].DBO.ndf' + @pDonem 
+	insert into #temptableNDF 	exec (@insSQL);
+	
+	SET @insSQL ='INSERT INTO [DWPTREND].[dbo].[TPHSELLOUT_'+@pDonem+ ']([YIL],[DONEM],[EczaneKod],[AccountName],[UrunKod],[Urun],[KUTU],[TL],[PazarTipi],[Kategori1],[Kategori2],[Kategori3],[Kategori4],[Kategori5], Goster, Bolge, UniverseCode) ' + 
+	' SELECT ''20'' + LEFT(' + @pDonem + ',2)  YIL, ' + @pDonem + '  AS DONEM,  GENEL.WHS as EczaneKod, ECZ.AccountName,  GENEL.PFC UrunKod, 
+	NDF.new_name Urun,  SUM(GENEL.PR_UNIT + GENEL.PR_BONUS)  as KUTU,  ' + 
+	'cast(Round(SUM((GENEL.PR_UNIT+ GENEL.PR_BONUS) * NDF.pub_price),0) as int) AS TL,  ' + 
+	'''ILAC''  AS PazarTipi, ATC.ATC1 AS Kategori1, ATC.ATC2 AS Kategori2, ATC.ATC3 AS Kategori3, ATC.ATC4 AS Kategori4, ndf.who_atc AS Kategori5, 1 AS Goster, BOLGE.Bolge,ECZ.UniverseCode   ' + 
+	'FROM  #temptable   AS GENEL ' + 
+	'LEFT JOIN  #temptableNDF   ndf ON NDF.prd_cd = GENEL.PFC ' + 
+	'LEFT JOIN IMSDAS_PROJECT_TURKEY_PHARMATREND_MONTHLY.DBO.account ECZ ON ECZ.AccountCode = GENEL.WHS  ' + 
+	'LEFT JOIN DWPTREND.DBO.TATCNAMES ATC ON ATC.PFC = GENEL.PFC ' + 
+	'LEFT JOIN [10.165.64.30].[IMSDAS_PROJECT_TP].DBO.NT70DAS1 ECZZ ON ECZZ.imscode = ECZ.UniverseCode    ' + 
+	'LEFT JOIN region reg on reg.brick1 = ECZZ.brick  ' + 
+	'LEFT JOIN DWPTREND.DBO.TBOLGELER BOLGE ON BOLGE.Brickcode =  reg.tcode1001  ' + 
+	'GROUP BY ECZ.AccountName,  ' + 
+	'gENEL.WHS, NDF.new_name, ' + 
+	'GENEL.PFC, NDF.prod_flag , ATC.ATC1,  ATC.ATC2, ATC.ATC3, ATC.ATC4, ndf.who_atc, BOLGE.Bolge, ECZ.UniverseCode '
+	EXEC   (@insSQL)
+	
+	SET @insSQL ='INSERT INTO [DWPTREND].[dbo].[TPHSELLOUT_'+@pDonem+ ']([YIL],[DONEM],[EczaneKod],[AccountName],[UrunKod],[Urun],[KUTU],[TL],[PazarTipi],[Kategori1],[Kategori2],[Kategori3],[Kategori4],[Kategori5], Goster, Bolge, UniverseCode) ' + 
+	'SELECT ''20'' + LEFT(' + @pDonem + ',2)  YIL,  ' + @pDonem + ' AS DONEM,  GENEL.WHS as EczaneKod, ECZ.AccountName,  GENEL.PFC UrunKod, 
+	NDF.new_name Urun,  SUM(GENEL.PR_UNIT + GENEL.PR_BONUS)  as KUTU,  ' + 
+	'cast(Round(SUM((GENEL.PR_UNIT+ GENEL.PR_BONUS) * NDF.isf),0) as int) AS TL, ' + 
+	'''ILAC DISI''  AS PazarTipi, ATC.NFC1 AS Kategori1, ATC.NFC2 AS Kategori2, ATC.NFC3 AS Kategori3, '''' AS Kategori4, ndf.who_atc AS Kategori5, 1 AS Goster, BOLGE.Bolge,ECZ.UniverseCode   ' +
+	'FROM  #temptable2   AS GENEL ' +
+	'LEFT JOIN  #temptableNDF   ndf ON NDF.prd_cd = GENEL.PFC ' +
+	'LEFT JOIN IMSDAS_PROJECT_TURKEY_PHARMATREND_MONTHLY.DBO.account ECZ ON ECZ.AccountCode = GENEL.WHS  ' +
+	'LEFT JOIN DWPTREND.DBO.TATCNAMES ATC ON ATC.PFC = GENEL.PFC ' +
+	'LEFT JOIN [10.165.64.30].[IMSDAS_PROJECT_TP].DBO.NT70DAS1 ECZZ ON ECZZ.imscode = ECZ.UniverseCode    ' +
+	'LEFT JOIN region reg on reg.brick1 = ECZZ.brick  ' +
+	'LEFT JOIN DWPTREND.DBO.TBOLGELER BOLGE ON BOLGE.Brickcode =  reg.tcode1001  ' +
+	'GROUP BY ECZ.AccountName, ' +
+	'gENEL.WHS, NDF.new_name, ' +
+	'GENEL.PFC, NDF.prod_flag , ATC.NFC1 ,  ATC.NFC2 , ATC.NFC3 , ndf.who_atc, BOLGE.Bolge, ECZ.UniverseCode '
+	EXEC (@insSQL)
+
+	drop table #temptable
+	drop table #temptable2
+	drop table #temptableNDF
+	
+	
+END
