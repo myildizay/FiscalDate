@@ -1,0 +1,86 @@
+USE [IMS_MYLAN]
+GO
+/****** Object:  StoredProcedure [dbo].[spGetCRMJSON]    Script Date: 30/04/2021 13:24:35 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+ALTER proc [dbo].[spGetCRMJSON]     
+        
+      @Key varchar(255) = 'ksm%iqvia20191224*aef#2',     
+      @Year nvarchar(100),   
+      @Period nvarchar(100),
+	  @DrEcz nvarchar(100)    
+         
+ AS
+ 
+declare @xmlOut as nvarchar(MAX)
+Declare @RequestText varchar(8000);  
+
+Set @xmlOut = 'BOS'
+
+set @RequestText=  
+'<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GetKusmanZiyaretIlacData xmlns="http://tempuri.org/">
+      <key>' + @Key + '</key>
+      <Sene>' + @Year + '</Sene>
+      <Donem>' + @Period + '</Donem>
+	  <Tip>' + @DrEcz + '</Tip>
+    </GetKusmanZiyaretIlacData>
+  </soap:Body>
+</soap:Envelope>'
+
+exec spHTTPRequest --spHTTPRequest  
+'http://kusman.cloud/clmentegrasyon_v045/KusmanDataAl.asmx',  
+'post',  
+@RequestText,  
+'http://tempuri.org/GetKusmanZiyaretIlacData',   -- this is your SOAPAction:  
+'', '', @xmlOut out  
+
+--truncate table JSDATA
+
+--insert into JSDATA VALUES (@xmlOut)
+
+SET @xmlOut = (select 
+Replace(@xmlOut,'<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"><soap:Body><GetKusmanZiyaretIlacDataResponse xmlns="http://tempuri.org/"><GetKusmanZiyaretIlacDataResult>','') )
+
+
+--use master
+--delete from FactCRMData
+insert into FactCRMData
+SELECT EventKod,PlanliZiyaret,Line,Bolge,SNo,UyeAd,UniteAd,Semt,Brick,iht,Unvan,DrSabit,DrAdSoyad,Tarih,Ilac,Sira
+,ikiliZiyaret 
+FROM  
+ OPENJSON (@xmlOut)  
+WITH (   
+              EventKod   nvarchar(200)		'$.EventKod' ,
+			  PlanliZiyaret nvarchar(5)     '$.P_Z',
+              Line    nvarchar(200)			'$.Line',  
+              Bolge nvarchar(200)			'$.Bolge',  
+              SNo nvarchar(200)				'$.SNo' ,
+			  UyeAd nvarchar(200)			'$.UyeAd',
+			  UniteAd nvarchar(200)			'$.UniteAd',
+			  Semt nvarchar(200)			'$.Semt',
+			  Brick nvarchar(200)			'$.Brick',
+			  iht nvarchar(200)				'$.Iht',
+			  Unvan nvarchar(200)			'$.Unvan',
+			  DrSabit int					'$.DrSabit',
+			  DrAdSoyad nvarchar(200)		'$.DrAdSoyad',
+			  Tarih nvarchar(200)			'$.Tarih',
+			  Ilac nvarchar(200)			'$.Ilac',
+			  Sira int						'$.IlacCalismaSirasi',
+			  ikiliZiyaret nvarchar(5)		'$.Ikili'
+ ) 
+
+
+ 
+
+
+
+
+
